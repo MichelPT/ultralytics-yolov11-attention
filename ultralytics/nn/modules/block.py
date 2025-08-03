@@ -51,8 +51,7 @@ __all__ = (
     "Attention",
     "PSA",
     "SCDown",
-    "TorchVision",
-    "CrossAttention"
+    "TorchVision"
 )
 
 
