@@ -713,8 +713,6 @@ class Index(nn.Module):
         """
         return x[self.index]
 
-# Add this class to the end of your conv.py file
-
 class CrossAttention(nn.Module):
     """
     Cross-Attention block for fusing two feature maps.

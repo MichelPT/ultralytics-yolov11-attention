@@ -47,7 +47,6 @@ from .block import (
     CBFuse,
     CBLinear,
     ContrastiveHead,
-    CrossAttention,
     GhostBottleneck,
     HGBlock,
     HGStem,
