@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from ultralytics.utils.torch_utils import fuse_conv_and_bn
 
-from .conv import Conv, DWConv, GhostConv, LightConv, RepConv, autopad
+from .conv import Conv, DWConv, GhostConv, LightConv, RepConv, autopad, CrossAttention
 from .transformer import TransformerBlock
 
 __all__ = (
@@ -49,6 +49,7 @@ __all__ = (
     "CIB",
     "C2fCIB",
     "Attention",
+    "CrossAttention",
     "PSA",
     "SCDown",
     "TorchVision"
