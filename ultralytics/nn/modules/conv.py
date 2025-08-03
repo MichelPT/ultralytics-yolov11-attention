@@ -23,6 +23,7 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
+    "CrossAttention"
 )
 
 
@@ -711,3 +712,72 @@ class Index(nn.Module):
             (torch.Tensor): Selected tensor.
         """
         return x[self.index]
+
+# Add this class to the end of your conv.py file
+
+class CrossAttention(nn.Module):
+    """
+    Cross-Attention block for fusing two feature maps.
+
+    This module takes two feature maps, `x1` (as the query) and `x2` (as the key/value),
+    and uses multi-head attention to fuse them. It's designed to replace simple
+    concatenation for more sophisticated feature integration.
+
+    Attributes:
+        q_conv (nn.Conv2d): Convolution to generate the query tensor.
+        k_conv (nn.Conv2d): Convolution to generate the key tensor.
+        v_conv (nn.Conv2d): Convolution to generate the value tensor.
+        mha (nn.MultiheadAttention): The core multi-head attention mechanism.
+        out_conv (nn.Conv2d): Final convolution layer after fusion.
+    """
+    def __init__(self, c1, c2, n_heads=8):
+        """
+        Initialize the CrossAttention module.
+
+        Args:
+            c1 (int): Number of channels in the query tensor (x1).
+            c2 (int): Number of channels in the key/value tensor (x2).
+            n_heads (int): Number of attention heads.
+        """
+        super().__init__()
+
+        # The embedding dimension for MultiheadAttention must be divisible by num_heads.
+        # This logic ensures we pick a valid number of heads.
+        if c1 % n_heads != 0:
+            # Finds the largest divisor of c1 that is less than or equal to n_heads
+            valid_heads = [h for h in range(n_heads, 0, -1) if c1 % h == 0]
+            n_heads = valid_heads[0] if valid_heads else 1 # Fallback to 1 head
+
+        self.q_conv = nn.Conv2d(c1, c1, 1, bias=False)
+        self.k_conv = nn.Conv2d(c2, c1, 1, bias=False)
+        self.v_conv = nn.Conv2d(c2, c1, 1, bias=False)
+        self.mha = nn.MultiheadAttention(embed_dim=c1, num_heads=n_heads)
+        self.out_conv = nn.Conv2d(c1, c1, 1)
+
+    def forward(self, x):
+        """
+        Forward pass for CrossAttention.
+
+        Args:
+            x (list[torch.Tensor]): A list of two tensors, [x1, x2].
+                                     x1 is the query, x2 is the key/value.
+
+        Returns:
+            (torch.Tensor): The fused feature map.
+        """
+        x1, x2 = x  # Unpack the two input tensors
+        B, C1, H1, W1 = x1.shape
+
+        # Generate Query from x1
+        q = self.q_conv(x1).flatten(2).permute(2, 0, 1)  # Shape: (H1*W1, B, C1)
+
+        # Generate Key and Value from x2
+        k = self.k_conv(x2).flatten(2).permute(2, 0, 1)  # Shape: (H2*W2, B, C1)
+        v = self.v_conv(x2).flatten(2).permute(2, 0, 1)  # Shape: (H2*W2, B, C1)
+
+        # Perform cross-attention
+        attn_output, _ = self.mha(q, k, v)  # Shape: (H1*W1, B, C1)
+
+        # Reshape and apply a residual connection
+        fused_features = attn_output.permute(1, 2, 0).reshape(B, C1, H1, W1)
+        return self.out_conv(x1 + fused_features)

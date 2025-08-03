@@ -43,6 +43,7 @@ from ultralytics.nn.modules import (
     Conv,
     Conv2,
     ConvTranspose,
+    CrossAttention,
     Detect,
     DWConv,
     DWConvTranspose2d,
