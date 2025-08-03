@@ -47,6 +47,7 @@ from .block import (
     CBFuse,
     CBLinear,
     ContrastiveHead,
+    CrossAttention,
     GhostBottleneck,
     HGBlock,
     HGStem,
@@ -66,6 +67,7 @@ from .conv import (
     Concat,
     Conv,
     Conv2,
+    CrossAttention,
     ConvTranspose,
     DWConv,
     DWConvTranspose2d,
@@ -179,4 +181,5 @@ __all__ = (
     "TorchVision",
     "Index",
     "A2C2f",
+    "CrossAttention"
 )
