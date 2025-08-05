@@ -1645,6 +1645,7 @@ def parse_model(d, ch, verbose=True):
             SCDown,
             C2fCIB,
             A2C2f,
+            CrossAttention,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
@@ -1715,6 +1716,9 @@ def parse_model(d, ch, verbose=True):
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
+        elif m is CrossAttention:
+            c2 = ch[f[0]]  # output channels same as first input (query)
+            args = [ch[f[0]], ch[f[-1]], *args]  # [c1, c2, n_heads, ...]
         elif m in frozenset(
             {Detect, WorldDetect, YOLOEDetect, Segment, YOLOESegment, Pose, OBB, ImagePoolingAttn, v10Detect}
         ):
