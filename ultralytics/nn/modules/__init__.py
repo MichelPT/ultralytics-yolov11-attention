@@ -16,6 +16,7 @@ Examples:
     >>> torch.onnx.export(m, x, f)
     >>> os.system(f"onnxslim {f} {f} && open {f}")  # pip install onnxslim
 """
+from .attention import CrossAttentionBlock # Add this import
 
 from .block import (
     C1,
@@ -59,6 +60,7 @@ from .block import (
     ResNetLayer,
     SCDown,
     TorchVision,
+    
 )
 from .conv import (
     CBAM,
@@ -180,5 +182,6 @@ __all__ = (
     "TorchVision",
     "Index",
     "A2C2f",
-    "CrossAttention"
+    "CrossAttention",
+    "CrossAttentionBlock"
 )
