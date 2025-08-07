@@ -1740,6 +1740,11 @@ def parse_model(d, ch, verbose=True):
             c2 = args[0]
             c1 = ch[f]
             args = [*args[1:]]
+        elif m is CrossAttentionBlock:
+            c1 = ch[f[0]] # Channels from the first input (query)
+            c2_input = ch[f[1]] # Channels from the second input (key/value)
+            c2 = c1 # The output channels are the same as the query's channels
+            args = [c1, c2_input, *args]
         else:
             c2 = ch[f]
 
