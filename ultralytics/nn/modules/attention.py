@@ -49,34 +49,58 @@ class CrossAttention(nn.Module):
 
 class CrossAttentionBlock(nn.Module):
     """
-    A wrapper block to handle the 2D feature map -> 1D sequence conversion
-    for using CrossAttention in a CNN.
+    A robust, Conv2d-based module that uses Cross-Attention to fuse two feature maps
+    and then concatenates them. This is a drop-in replacement for a standard Concat layer.
     """
-    def __init__(self, c1, c2):  # c1 = query_channels, c2 = key_value_channels
+    def __init__(self, c1, c2, n_heads=8):
+        """
+        Initializes the CrossAttentionConcat module.
+        Args:
+            c1 (int): Channels of the first input (x1), which will be the query.
+            c2 (int): Channels of the second input (x2), which will be the key/value.
+            n_heads (int): Number of attention heads.
+        """
         super().__init__()
-        # This part is fine
-        self.ca = CrossAttention(query_dim=c1, key_value_dim=c2, head_dim=c1 // 8, num_heads=8)
-        self.conv = nn.Conv2d(c1, c1, 1, bias=False)  # To fuse the output
-        self.bn = nn.BatchNorm2d(c1)
+        # Ensure n_heads is a valid divisor of c1
+        if c1 % n_heads != 0:
+            valid_heads = [h for h in range(n_heads, 0, -1) if c1 % h == 0]
+            n_heads = valid_heads[0] if valid_heads else 1
 
-    # --- THIS METHOD NEEDS TO BE CHANGED ---
-    def forward(self, x):  # Change signature to accept one argument 'x'
-        x_query, x_kv = x  # Unpack the list of two tensors
-        # --- END OF CHANGES ---
+        # Use Conv2d for projections to keep tensors as 2D feature maps
+        self.q_conv = nn.Conv2d(c1, c1, 1, bias=False)
+        self.k_conv = nn.Conv2d(c2, c1, 1, bias=False)
+        self.v_conv = nn.Conv2d(c2, c1, 1, bias=False)
+        
+        self.mha = nn.MultiheadAttention(embed_dim=c1, num_heads=n_heads, batch_first=True)
+        self.out_conv = nn.Conv2d(c1, c1, 1)
 
-        # The rest of your code remains the same
-        B, C1, H, W = x_query.shape
+    def forward(self, x):
+        """
+        Forward pass.
+        Args:
+            x (list[torch.Tensor]): A list of two tensors, [x1, x2].
+        """
+        x1, x2 = x  # x1 is the main path (query), x2 is from the backbone (key/value)
+        B, C1, H, W = x1.shape
         
-        # Flatten feature maps to sequences
-        query_seq = x_query.flatten(2).transpose(1, 2)
-        kv_seq = x_kv.flatten(2).transpose(1, 2)
+        # Get projections
+        q = self.q_conv(x1)
+        k = self.k_conv(x2)
+        v = self.v_conv(x2)
         
-        # Apply cross-attention
-        attended_seq = self.ca(query_seq, kv_seq)
+        # Reshape for MHA
+        q = q.flatten(2).transpose(1, 2)  # (B, H*W, C1)
+        k = k.flatten(2).transpose(1, 2)
+        v = v.flatten(2).transpose(1, 2)
         
-        # Reshape back to 2D feature map
-        attended_map = attended_seq.transpose(1, 2).view(B, C1, H, W)
+        # Apply attention
+        attn_output, _ = self.mha(q, k, v)
         
-        # Combine with original query via a residual-like connection
-        output = self.bn(self.conv(attended_map)) + x_query
-        return output
+        # Reshape back to 2D feature map and process
+        fused_x1 = self.out_conv(attn_output.transpose(1, 2).reshape(B, C1, H, W))
+        
+        # Add residual connection to the query path
+        refined_x1 = x1 + fused_x1
+        
+        # Concatenate the refined query path with the original key/value path
+        return torch.cat([refined_x1, x2], dim=1)
