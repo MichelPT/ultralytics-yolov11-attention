@@ -52,24 +52,27 @@ class CrossAttentionBlock(nn.Module):
     A wrapper block to handle the 2D feature map -> 1D sequence conversion
     for using CrossAttention in a CNN.
     """
-    def __init__(self, c1, c2): # c1 = query_channels, c2 = key_value_channels
+    def __init__(self, c1, c2):  # c1 = query_channels, c2 = key_value_channels
         super().__init__()
-        self.ca = CrossAttention(query_dim=c1, key_value_dim=c2, head_dim=c1//8, num_heads=8)
-        self.conv = nn.Conv2d(c1, c1, 1, bias=False) # To fuse the output
+        # This part is fine
+        self.ca = CrossAttention(query_dim=c1, key_value_dim=c2, head_dim=c1 // 8, num_heads=8)
+        self.conv = nn.Conv2d(c1, c1, 1, bias=False)  # To fuse the output
         self.bn = nn.BatchNorm2d(c1)
 
-    def forward(self, x_query, x_kv):
-        # x_query: (B, C1, H, W)
-        # x_kv: (B, C2, H, W)
+    # --- THIS METHOD NEEDS TO BE CHANGED ---
+    def forward(self, x):  # Change signature to accept one argument 'x'
+        x_query, x_kv = x  # Unpack the list of two tensors
+        # --- END OF CHANGES ---
+
+        # The rest of your code remains the same
         B, C1, H, W = x_query.shape
-        _, C2, _, _ = x_kv.shape
         
         # Flatten feature maps to sequences
-        query_seq = x_query.flatten(2).transpose(1, 2)  # (B, H*W, C1)
-        kv_seq = x_kv.flatten(2).transpose(1, 2)    # (B, H*W, C2)
+        query_seq = x_query.flatten(2).transpose(1, 2)
+        kv_seq = x_kv.flatten(2).transpose(1, 2)
         
         # Apply cross-attention
-        attended_seq = self.ca(query_seq, kv_seq) # (B, H*W, C1)
+        attended_seq = self.ca(query_seq, kv_seq)
         
         # Reshape back to 2D feature map
         attended_map = attended_seq.transpose(1, 2).view(B, C1, H, W)
